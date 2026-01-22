@@ -9,7 +9,6 @@ import { RequireAuth } from "./features/auth/components/RequireAuth";
 export default function App() {
   const { user, isLoading } = useAuth();
 
-  // DOK SE UCITAVA (Provjera sesije preko /me)
   if (isLoading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'white', background: '#121212' }}>
@@ -34,7 +33,6 @@ export default function App() {
         } 
       />
 
-      {/* DEFAULT RUTA */}
       <Route path="*" element={<Navigate to={user ? "/chat" : "/login"} replace />} />
     </Routes>
   );

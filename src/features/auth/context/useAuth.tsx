@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import type { User } from "../types/auth.types";
 import { authFetch } from "../api/authFetch";
+import { logoutRequest } from "../api/auth.api";
 
 type AuthContextType = {
   user: User | null;
@@ -22,10 +23,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   };
 
-  const logout = () => {
-    setUser(null);
-    setIsLoading(false);
-  };
+  const logout = async () => {
+  await logoutRequest();
+  setUser(null);
+  setIsLoading(false);
+};
 
   useEffect(() => {
   const checkAuth = async () => {
