@@ -1,22 +1,14 @@
-type LoginRequest = {
-  email: string;
-  password: string;
-};
+import type { LoginRequest, LoginResponse } from "../types/auth.types";
+import { API_BASE_URL } from "../utils/config";
 
-type LoginResponse = {
-  id: string;
-  name: string;
-  mail: string;
-  accessToken: string;
-};
-// http://localhost:5078/api/auth/login
+// ruta s postamnana za logijn http://localhost:5078/api/auth/login
 
-const API_URL = "http://localhost:5078/api"; 
 
 export async function loginRequest(
   data: LoginRequest
 ): Promise<LoginResponse> {
-  const response = await fetch(`${API_URL}/auth/login`, {
+
+  const response = await fetch(`${API_BASE_URL}/auth/login`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -36,7 +28,7 @@ export async function loginRequest(
 }
 
 export async function logoutRequest(): Promise<void> {
-  const response = await fetch(`${API_URL}/auth/logout`, {
+  const response = await fetch(`${API_BASE_URL}/auth/logout`, {
     method: "POST",
     credentials: "include",
   });
@@ -46,3 +38,15 @@ export async function logoutRequest(): Promise<void> {
   }
     return;
 }
+
+export async function refreshToken(): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
+    method: "POST",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Refresh token failed");
+  }
+}
+
