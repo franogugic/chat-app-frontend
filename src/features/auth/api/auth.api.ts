@@ -42,11 +42,16 @@ export async function logoutRequest(): Promise<void> {
 export async function refreshToken(): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
     credentials: "include",
+    body: JSON.stringify({}),
   });
 
   if (!response.ok) {
     throw new Error("Refresh token failed");
   }
 }
+
 
