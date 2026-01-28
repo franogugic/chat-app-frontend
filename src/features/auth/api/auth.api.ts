@@ -3,6 +3,10 @@ import { API_BASE_URL } from "../utils/config";
 
 // ruta s postamnana za logijn http://localhost:5078/api/auth/login
 
+export interface AllUsersBySearchResponseDTO {
+  name: string;
+  id: string;
+}
 
 export async function loginRequest(
   data: LoginRequest
@@ -52,6 +56,27 @@ export async function refreshToken(): Promise<void> {
   if (!response.ok) {
     throw new Error("Refresh token failed");
   }
+}
+
+export async function searchUsers(searchTerm: string): Promise<AllUsersBySearchResponseDTO[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/auth/search?searchTerm=${encodeURIComponent(searchTerm)}`, 
+    {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (response.status === 401) {
+    console.error("Token nije valjan ili je istekao.");
+    return [];
+  }
+
+  if (!response.ok) return [];
+  return response.json();
 }
 
 
