@@ -3,53 +3,104 @@ import { ChatSidebar } from "./components/ChatSidebar";
 import { ChatWindow } from "./components/ChatWindow";
 import { getConversationById, getUserConversations, type ConversationResponse } from "../auth/api/conversation.api";
 import { useAuth } from "../auth/context/useAuth";
+import * as signalR from "@microsoft/signalr";
 
 export default function ChatPage() {
   const [conversations, setConversations] = useState<ConversationResponse[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<ConversationResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { user, logout } = useAuth();
+  const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
 
   // 1. Učitavanje svih konverzacija za sidebar
+  const fetchConversations = async () => {
+    try {
+      const data = await getUserConversations();
+      const convs = (data as any).conversations || data;
+      setConversations(Array.isArray(convs) ? convs : []);
+    } catch (err) {
+      console.error("Greška pri učitavanju konverzacija:", err);
+    }
+  };
+
   useEffect(() => {
-    const fetchConversations = async () => {
-      setIsLoading(true);
-      try {
-        const data = await getUserConversations();
-        const convs = (data as any).conversations || data;
-        setConversations(Array.isArray(convs) ? convs : []);
-      } catch (err) {
-        console.error("Greška pri učitavanju konverzacija:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchConversations();
+    setIsLoading(true);
+    fetchConversations().finally(() => setIsLoading(false));
   }, []);
 
-  // 2. Učitavanje poruka - POPRAVLJENO
+  // 2. SignalR Inicijalizacija
+  useEffect(() => {
+    const newConnection = new signalR.HubConnectionBuilder()
+      .withUrl("http://localhost:5078/chatHub")
+      .withAutomaticReconnect()
+      .build();
+
+    newConnection.start()
+      .then(() => {
+        setConnection(newConnection);
+        console.log("SignalR Connected");
+      })
+      .catch(err => console.log("SignalR Error", err));
+
+    return () => { newConnection.stop(); };
+  }, []);
+
+  // 3. SignalR Listener (sa zaštitom od duplanja)
+  useEffect(() => {
+    if (connection && selectedConversation?.id) {
+      const currentId = String(selectedConversation.id).toLowerCase();
+
+      connection.on("ReceiveMessage", (message: any) => {
+        const incomingId = String(message.conversationId || message.ConversationId || currentId).toLowerCase();
+        
+        if (incomingId === currentId) {
+          setSelectedConversation((prev: any) => {
+            if (!prev) return prev;
+            const messageId = message.id || message.Id;
+            const alreadyExists = prev.messages?.some((m: any) => (m.id || m.Id) === messageId);
+            if (alreadyExists) return prev;
+
+            return {
+              ...prev,
+              messages: [...(prev.messages || []), {
+                ...message,
+                id: messageId,
+                content: message.content || message.Content,
+                senderId: message.senderId || message.SenderId,
+                sentAt: message.sentAt || message.SentAt
+              }]
+            };
+          });
+        }
+        fetchConversations();
+      });
+
+      connection.invoke("JoinConversation", currentId);
+    }
+
+    return () => {
+      connection?.off("ReceiveMessage");
+    };
+  }, [connection, selectedConversation?.id]);
+
+  // 4. TVOJ ORIGINALNI KOD ZA UČITAVANJE PORUKA (VRAĆENO)
   useEffect(() => {
     const cid = selectedConversation?.id;
     
     // Blokiramo samo ako je ID baš prazan ili undefined. 
-    // NE blokiramo ako je isNew, jer moramo provjeriti postoji li već chat za tog usera.
     if (!cid || cid === "undefined") {
       return;
     }
 
     const fetchMessages = async () => {
       try {
-        // Zovemo API da vidimo imamo li već ovaj chat u bazi
         const data = await getConversationById(cid);
-        
-        // Ako backend nađe chat, ažuriramo stanje s porukama i gasimo isNew
         setSelectedConversation((prev: any) => ({
           ...prev,
           ...data,
           isNew: false 
         }));
       } catch (err) {
-        // Ako je 404, šutimo i ostavljamo prozor praznim (isNew ostaje true)
         console.log("Chat još ne postoji u bazi podataka.");
       }
     };
@@ -57,20 +108,24 @@ export default function ChatPage() {
     fetchMessages();
   }, [selectedConversation?.id]); // Reagira na promjenu selekcije
 
+  // 5. Hendlanje slanja poruke (VRAĆENO NA TVOJE + Zaštita od duplanja)
   const handleNewMessage = async (sentMessage: any) => {
     if (sentMessage && sentMessage.conversationId) {
-      setSelectedConversation((prev: any) => ({
-        ...prev,
-        id: sentMessage.conversationId,
-        isNew: false,
-        messages: [...(prev?.messages || []), sentMessage]
-      }));
-    }
+      setSelectedConversation((prev: any) => {
+        if (!prev) return prev;
+        const messageId = sentMessage.id || sentMessage.Id;
+        const alreadyExists = prev.messages?.some((m: any) => (m.id || m.Id) === messageId);
+        if (alreadyExists) return prev;
 
-    // Osvježi sidebar
-    const data = await getUserConversations();
-    const convs = (data as any).conversations || data;
-    setConversations(Array.isArray(convs) ? convs : []);
+        return {
+          ...prev,
+          id: sentMessage.conversationId,
+          isNew: false,
+          messages: [...(prev?.messages || []), sentMessage]
+        };
+      });
+    }
+    fetchConversations();
   };
 
   return (
