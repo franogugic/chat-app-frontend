@@ -13,8 +13,9 @@ export function ChatWindow({ conversation, currentUserId, onNewMessage }: ChatWi
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [conversation?.messages]);
+  // Ovo će te automatski "baciti" na dno svaki put kad se niz poruka promijeni
+  scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+}, [conversation?.messages]);
 
   const getChatTitle = () => {
     if (!conversation) return "";
