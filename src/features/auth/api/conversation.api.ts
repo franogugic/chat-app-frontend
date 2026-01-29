@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "../utils/config";
+import { authFetch } from "./authFetch";
 
 export interface LastMessage {
   content: string;
@@ -12,6 +12,7 @@ export interface MessageResponse {
   content: string;
   senderId: string;
   sentAt: string;
+  conversationId?: string;
 }
 
 export interface ConversationResponse {
@@ -19,6 +20,8 @@ export interface ConversationResponse {
   title: string;
   lastMessage: LastMessage | null;
   messages?: MessageResponse[]; 
+  isNew?: boolean;
+  name?: string;
 }
 
 export interface GetConversationsResponse {
@@ -27,45 +30,50 @@ export interface GetConversationsResponse {
 }
 
 export async function getUserConversations(): Promise<GetConversationsResponse> {
-  const response = await fetch(`${API_BASE_URL}/conversation/user/conversations`, {
+  // KORISTIMO authFetch umjesto fetch
+  const response = await authFetch(`/conversation/user/conversations`, {
     method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    credentials: "include", 
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch conversations");
-  }
-
-  return response.json();
-}
-
-export async function createConversation(otherUserId: string): Promise<ConversationResponse> {
-  const response = await fetch(`${API_BASE_URL}/conversations/private/${otherUserId}`, {
-    method: "POST", 
-    credentials: "include",
     headers: { "Content-Type": "application/json" },
   });
-
-  if (!response.ok) throw new Error("Neuspješno kreiranje konverzacije");
+  if (!response.ok) throw new Error("Failed to fetch conversations");
   return response.json();
 }
 
 export async function getConversationById(otherUserId: string): Promise<any> {
-  const url = `${API_BASE_URL}/conversation/private/${otherUserId}`;
-  
-  console.log("Dohvaćam razgovor s korisnikom:", otherUserId);
+  if (!otherUserId || otherUserId === "undefined") {
+    throw new Error("Invalid ID");
+  }
 
-  const response = await fetch(url, {
+  // KORISTIMO authFetch
+  const response = await authFetch(`/conversation/private/${otherUserId}`, {
     method: "GET",
     headers: { "Content-Type": "application/json" },
-    credentials: "include",
   });
 
-  if (!response.ok) throw new Error("Neuspješno dohvaćanje razgovora");
+  if (!response.ok) {
+    throw new Error("Chat not found (404)");
+  }
   
   return response.json(); 
 }
 
+export async function sendMessage(content: string, recipientId: string, conversationId?: string) {
+  const validConversationId = (conversationId && conversationId !== "undefined" && conversationId !== "00000000-0000-0000-0000-000000000000") 
+    ? conversationId 
+    : "00000000-0000-0000-0000-000000000000";
+
+  // KORISTIMO authFetch
+  const response = await authFetch(`/message/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      content: content,
+      recipientId: recipientId,
+      conversationId: validConversationId,
+      messageType: 0 
+    }),
+  });
+
+  if (!response.ok) throw new Error("Greška pri slanju poruke");
+  return response.json();
+}
