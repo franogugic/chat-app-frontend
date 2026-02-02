@@ -16,21 +16,31 @@ export function MessageBubble({ content, sentAt, isMe, isRead }: MessageBubblePr
         className={`max-w-md px-4 py-2.5 rounded-2xl shadow-sm ${
           isMe
             ? 'bg-blue-600 text-white rounded-br-sm'
-            : 'bg-white text-gray-900 rounded-bl-sm border border-gray-100'
+            : 'bg-white text-gray-900 rounded-bl-sm border border-gray-100 shadow-sm'
         }`}
       >
-        <p className="text-[15px] leading-relaxed break-words">{content}</p>
+        <p className="leading-relaxed break-words">{content}</p>
         <div className={`flex items-center mt-1 gap-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
-          <span className={`text-[10px] ${isMe ? 'text-blue-100' : 'text-gray-500'}`}>
+          <span className={`text-[10px] ${isMe ? 'text-blue-100 opacity-80' : 'text-gray-500'}`}>
             {formatTime(sentAt)}
           </span>
           {isMe && (
-            <div className="flex items-center ml-0.5">
-              <svg className={`w-3 h-3 ${isRead ? "text-white" : "text-blue-200 opacity-60"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-center ml-1">
+              <svg 
+                className={`w-3 h-3 ${isRead ? "text-blue-200" : "text-white/50"}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
               </svg>
               {isRead && (
-                <svg className="w-3 h-3 text-white -ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg 
+                  className="w-3 h-3 text-blue-200 -ml-2" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
                 </svg>
               )}

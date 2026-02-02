@@ -16,10 +16,21 @@ export default function ChatPage() {
     try {
       const data = await getUserConversations();
       const convs = (data as any).conversations || data;
-      setConversations(Array.isArray(convs) ? convs : []);
-    } catch (err) {
-      console.error("Greška pri učitavanju konverzacija:", err);
-    }
+      
+      const processedConvs = (Array.isArray(convs) ? convs : []).map((c: any) => {
+        let count = 0;
+        const lastMsg = c.lastMessage;
+        if (lastMsg && lastMsg.senderId !== user?.id && !(lastMsg.isRead || lastMsg.IsRead)) {
+          count = 1; 
+        }
+        return { 
+          ...c, 
+          frontendUnreadCount: c.unreadCount !== undefined ? c.unreadCount : count 
+        };
+      });
+
+      setConversations(processedConvs);
+    } catch (err) { console.error(err); }
   };
 
   useEffect(() => {
@@ -33,73 +44,49 @@ export default function ChatPage() {
       .withAutomaticReconnect()
       .build();
 
-    newConnection.start()
-      .then(() => setConnection(newConnection))
-      .catch(err => console.log("SignalR Error", err));
-
+    newConnection.start().then(() => setConnection(newConnection)).catch(err => console.log(err));
     return () => { newConnection.stop(); };
   }, []);
 
-  // OVO JE TVOJ ORIGINALNI EFFECT KOJI JE RADIO - VRATIO SAM GA
   useEffect(() => {
-    if (connection && selectedConversation?.id) {
-      const currentConvId = String(selectedConversation.id).toLowerCase();
-
+    if (connection) {
       connection.on("ReceiveMessage", (message: any) => {
-        const incomingId = String(message.conversationId || message.ConversationId || currentConvId).toLowerCase();
+        const currentConvId = selectedConversation?.id ? String(selectedConversation.id).toLowerCase() : null;
+        const incomingId = String(message.conversationId || message.ConversationId).toLowerCase();
         
         if (incomingId === currentConvId) {
           setSelectedConversation((prev: any) => {
             if (!prev) return prev;
-            const messageId = message.id || message.Id;
-            const alreadyExists = prev.messages?.some((m: any) => (m.id || m.Id) === messageId);
-            if (alreadyExists) return prev;
-
-            return {
-              ...prev,
-              messages: [...(prev.messages || []), message]
-            };
+            if (prev.messages?.some((m: any) => (m.id || m.Id) === (message.id || message.Id))) return prev;
+            return { ...prev, messages: [...(prev.messages || []), message] };
           });
         }
-        // DODAO SAM SAMO OVU LINIJU NATRAG DA SIDEBAR VIDI NOVU PORUKU
         fetchConversations();
       });
 
       connection.on("MessagesRead", (convId: string) => {
-        if (String(selectedConversation.id).toLowerCase() === convId.toLowerCase()) {
-           getConversationById(convId).then(data => {
-             setSelectedConversation(prev => prev ? { ...prev, ...data } : null);
-           });
+        if (selectedConversation?.id && String(selectedConversation.id).toLowerCase() === convId.toLowerCase()) {
+           getConversationById(convId).then(data => setSelectedConversation(prev => prev ? { ...prev, ...data } : null));
         }
-        // DODAO SAM SAMO OVU LINIJU DA SIDEBAR VIDI KVAČICE
         fetchConversations();
       });
-
-      connection.invoke("JoinConversation", currentConvId);
     }
 
     return () => {
       connection?.off("ReceiveMessage");
       connection?.off("MessagesRead");
     };
-    // VRATIO SAM NA PRAZAN ILI TVOJ STARI DEPENDENCY DA NE PUCA LIVE CHAT
   }, [connection, selectedConversation?.id]); 
 
   useEffect(() => {
     const cid = selectedConversation?.id;
-    if (!cid || cid === "undefined") return;
+    if (!cid || cid === "undefined" || (selectedConversation as any).isNew) return;
 
     const fetchMessages = async () => {
       try {
         const data = await getConversationById(cid);
-        setSelectedConversation((prev: any) => ({
-          ...prev,
-          ...data,
-          isNew: false 
-        }));
-      } catch (err) {
-        console.log("Chat ne postoji.");
-      }
+        setSelectedConversation((prev: any) => ({ ...prev, ...data, isNew: false }));
+      } catch (err) { console.log(err); }
     };
     fetchMessages();
   }, [selectedConversation?.id]);
@@ -108,23 +95,14 @@ export default function ChatPage() {
     if (sentMessage && sentMessage.conversationId) {
       setSelectedConversation((prev: any) => {
         if (!prev) return prev;
-        const messageId = sentMessage.id || sentMessage.Id;
-        const alreadyExists = prev.messages?.some((m: any) => (m.id || m.Id) === messageId);
-        if (alreadyExists) return prev;
-
-        return {
-          ...prev,
-          id: sentMessage.conversationId,
-          isNew: false,
-          messages: [...(prev?.messages || []), sentMessage]
-        };
+        return { ...prev, id: sentMessage.conversationId, isNew: false, messages: [...(prev?.messages || []), sentMessage] };
       });
     }
     fetchConversations();
   };
 
   return (
-    <div className="flex h-screen bg-white overflow-hidden font-sans antialiased text-gray-900">
+    <div className="h-screen w-full flex bg-gray-50 overflow-hidden font-sans">
       <ChatSidebar 
         conversations={conversations}
         currentUser={user}
