@@ -55,13 +55,13 @@ export function ChatSidebar({ currentUser, logout, conversations, selectedId, on
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center shadow-sm">
               <MessageCircle className="w-6 h-6 text-white" />
             </div>
-            <h1 className="text-xl font-semibold text-gray-900">Poruke</h1>
+            <h1 className="text-xl font-semibold text-gray-900 tracking-tight">Messages</h1>
           </div>
-          <button onClick={logout} className="p-2 hover:bg-gray-100 rounded-lg transition">
-            <LogOut className="w-5 h-5 text-gray-600" />
+          <button onClick={logout} className="p-2 hover:bg-red-50 text-gray-600 hover:text-red-600 rounded-lg transition-colors">
+            <LogOut className="w-5 h-5" />
           </button>
         </div>
 
@@ -71,13 +71,13 @@ export function ChatSidebar({ currentUser, logout, conversations, selectedId, on
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Pretraži..."
-            className="w-full pl-10 pr-4 py-2 bg-gray-100 border border-transparent rounded-lg focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
+            placeholder="Search messages or people..."
+            className="w-full pl-10 pr-4 py-2.5 bg-gray-100 border border-transparent rounded-xl focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
           />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
         {isSearchMode ? (
           <div className="flex flex-col">
             {searchResults.length > 0 ? (
@@ -100,16 +100,6 @@ export function ChatSidebar({ currentUser, logout, conversations, selectedId, on
                       <h3 className="font-medium text-gray-900 truncate">{u.name}</h3>
                       {existing && (
                         <div className="flex items-center gap-1">
-                          {existing.lastMessage?.senderId === currentUser?.id && (
-                            <div className={`flex items-center ${existing.lastMessage?.isRead ? "text-blue-500" : "text-gray-400"}`}>
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-                              </svg>
-                              <svg className="w-3 h-3 -ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-                              </svg>
-                            </div>
-                          )}
                           <p className="text-sm text-gray-500 truncate">{existing.lastMessage?.content}</p>
                         </div>
                       )}
@@ -120,9 +110,11 @@ export function ChatSidebar({ currentUser, logout, conversations, selectedId, on
             ) : (
               !isSearching && (
                 <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                  <UserX className="w-10 h-10 text-gray-300 mb-2" />
-                  <p className="text-gray-500 font-medium">Korisnik nije pronađen</p>
-                  <p className="text-xs text-gray-400">Pokušajte s drugim imenom</p>
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                    <UserX className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <p className="text-gray-900 font-semibold">No results found</p>
+                  <p className="text-sm text-gray-500 mt-1">Check the spelling or try a different name</p>
                 </div>
               )
             )}

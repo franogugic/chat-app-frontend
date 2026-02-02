@@ -25,27 +25,26 @@ export function ChatWindow({ conversation, currentUserId, onNewMessage, connecti
     }
   }, [conversation?.id, conversation?.messages?.length, connection]);
 
+  // Usklađena logika za partnera
+  const partner = conversation?.participants?.find((p: any) => p.userId !== currentUserId) 
+               || (conversation?.isNew ? conversation : null);
+  
+  const partnerId = partner?.userId || conversation?.recipientId || (conversation?.isNew ? conversation.id : null);
+  const chatPartnerName = partner?.name || partner?.username || conversation?.title || conversation?.name || "Chat";
+
   useEffect(() => {
-    if (!connection || !conversation) {
+    if (!connection || !partnerId) {
       setIsPartnerOnline(false);
       return;
     }
-    const partnerId = conversation.isNew 
-      ? conversation.id 
-      : conversation.participants?.find((p: any) => p.userId !== currentUserId)?.userId 
-        || conversation.recipientId;
-    if (!partnerId) return;
-
     connection.invoke("IsThisUserOnline", partnerId)
       .then((online: boolean) => setIsPartnerOnline(online))
       .catch((err: any) => console.error(err));
 
-    const handleStatusChange = (userId: string, isOnline: boolean) => {
-      if (userId === partnerId) setIsPartnerOnline(isOnline);
-    };
+    const handleStatusChange = (uId: string, status: boolean) => { if (uId === partnerId) setIsPartnerOnline(status); };
     connection.on("UserStatusChanged", handleStatusChange);
     return () => { connection.off("UserStatusChanged", handleStatusChange); };
-  }, [connection, conversation, currentUserId]);
+  }, [connection, partnerId]);
 
   const handleSend = async (e: FormEvent) => {
     e.preventDefault();
@@ -53,7 +52,7 @@ export function ChatWindow({ conversation, currentUserId, onNewMessage, connecti
     try {
       const isNew = conversation.isNew;
       const conversationIdToSend = isNew ? "00000000-0000-0000-0000-000000000000" : conversation.id;
-      const recipientId = isNew ? conversation.id : (conversation.recipientId || conversation.id);
+      const recipientId = isNew ? conversation.id : (conversation.recipientId || partnerId);
       const sentMessage = await sendMessage(messageInput, recipientId, conversationIdToSend);
       setMessageInput("");
       if (onNewMessage) onNewMessage(sentMessage);
@@ -67,12 +66,10 @@ export function ChatWindow({ conversation, currentUserId, onNewMessage, connecti
           <MessageCircle className="w-8 h-8 text-gray-400" />
         </div>
         <h2 className="text-xl font-semibold text-gray-900 uppercase tracking-widest">Chat App</h2>
-        <p className="text-gray-400 text-sm mt-2">Odaberite osobu za razgovor</p>
+        <p className="text-gray-400 text-sm mt-2">Select a person to start chatting</p>
       </div>
     );
   }
-
-  const chatPartnerName = conversation.title || conversation.name || "Korisnik";
 
   return (
     <div className="flex-1 flex flex-col bg-white">
@@ -82,9 +79,7 @@ export function ChatWindow({ conversation, currentUserId, onNewMessage, connecti
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-medium uppercase">
               {chatPartnerName[0]}
             </div>
-            {isPartnerOnline && (
-              <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
-            )}
+            {isPartnerOnline && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>}
           </div>
           <div>
             <h2 className="font-medium text-gray-900 leading-tight">{chatPartnerName}</h2>
@@ -114,7 +109,7 @@ export function ChatWindow({ conversation, currentUserId, onNewMessage, connecti
               value={messageInput}
               onChange={(e) => setMessageInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(e); } }}
-              placeholder="Napišite poruku..."
+              placeholder="Type a message..."
               rows={1}
               className="w-full pl-4 pr-12 py-3 border border-gray-300 rounded-xl resize-none outline-none focus:ring-2 focus:ring-blue-500 transition block leading-normal"
               style={{ minHeight: '48px', maxHeight: '120px' }}

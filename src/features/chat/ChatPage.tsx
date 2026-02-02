@@ -9,7 +9,6 @@ export default function ChatPage() {
   const [conversations, setConversations] = useState<ConversationResponse[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<ConversationResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [onlineUsers, setOnlineUsers] = useState<string[]>([]); // Pratimo online ID-ove
   const { user, logout } = useAuth();
   const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
 
@@ -17,7 +16,21 @@ export default function ChatPage() {
     try {
       const data = await getUserConversations();
       const convs = (data as any).conversations || data;
-      setConversations(Array.isArray(convs) ? convs : []);
+      
+      const processedConvs = (Array.isArray(convs) ? convs : []).map((c: any) => {
+        // Ručni izračun nepročitanih na temelju zadnje poruke ako backend ne šalje count
+        let count = 0;
+        const lastMsg = c.lastMessage;
+        if (lastMsg && lastMsg.senderId !== user?.id && !(lastMsg.isRead || lastMsg.IsRead)) {
+          count = 1; 
+        }
+        return { 
+          ...c, 
+          frontendUnreadCount: c.unreadCount !== undefined ? c.unreadCount : count 
+        };
+      });
+
+      setConversations(processedConvs);
     } catch (err) { console.error(err); }
   };
 
@@ -32,27 +45,12 @@ export default function ChatPage() {
       .withAutomaticReconnect()
       .build();
 
-    newConnection.start()
-      .then(() => {
-        setConnection(newConnection);
-        // Kada se spoji, možemo tražiti listu svih trenutno online usera ako backend to podržava
-        // Ili čekati "UserStatusChanged" evente
-      })
-      .catch(err => console.log(err));
-
+    newConnection.start().then(() => setConnection(newConnection)).catch(err => console.log(err));
     return () => { newConnection.stop(); };
   }, []);
 
   useEffect(() => {
     if (connection) {
-      // Slušamo promjene statusa za SIDEBAR
-      connection.on("UserStatusChanged", (userId: string, isOnline: boolean) => {
-        setOnlineUsers(prev => {
-          if (isOnline) return prev.includes(userId) ? prev : [...prev, userId];
-          return prev.filter(id => id !== userId);
-        });
-      });
-
       connection.on("ReceiveMessage", (message: any) => {
         const currentConvId = selectedConversation?.id ? String(selectedConversation.id).toLowerCase() : null;
         const incomingId = String(message.conversationId || message.ConversationId).toLowerCase();
@@ -75,20 +73,23 @@ export default function ChatPage() {
       });
     }
     return () => {
-      connection?.off("UserStatusChanged");
       connection?.off("ReceiveMessage");
       connection?.off("MessagesRead");
     };
   }, [connection, selectedConversation?.id]);
 
-  // Mapiramo konverzacije i dodajemo isOnline status na temelju onlineUsers niza
-  const conversationsWithStatus = conversations.map(conv => {
-    const partnerId = conv.recipientId || conv.participants?.find((p: any) => p.userId !== user?.id)?.userId;
-    return {
-      ...conv,
-      isOnline: onlineUsers.includes(partnerId || '')
+  useEffect(() => {
+    const cid = selectedConversation?.id;
+    if (!cid || cid === "undefined" || (selectedConversation as any).isNew) return;
+
+    const fetchMessages = async () => {
+      try {
+        const data = await getConversationById(cid);
+        setSelectedConversation((prev: any) => ({ ...prev, ...data, isNew: false }));
+      } catch (err) { console.log(err); }
     };
-  });
+    fetchMessages();
+  }, [selectedConversation?.id]);
 
   const handleNewMessage = (sentMessage: any) => {
     if (sentMessage && sentMessage.conversationId) {
@@ -103,7 +104,7 @@ export default function ChatPage() {
   return (
     <div className="h-screen w-full flex bg-gray-50 overflow-hidden font-sans">
       <ChatSidebar 
-        conversations={conversationsWithStatus}
+        conversations={conversations}
         currentUser={user}
         logout={logout}
         onSelectConversation={(conv) => setSelectedConversation({ ...conv, isNew: false })}
