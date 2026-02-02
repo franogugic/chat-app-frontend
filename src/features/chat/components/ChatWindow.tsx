@@ -6,25 +6,62 @@ interface ChatWindowProps {
   conversation: any | null;
   currentUserId?: string;
   onNewMessage?: (msg: any) => void;
+  connection: any; 
 }
 
-export function ChatWindow({ conversation, currentUserId, onNewMessage }: ChatWindowProps) {
+export function ChatWindow({ conversation, currentUserId, onNewMessage, connection }: ChatWindowProps) {
   const [messageInput, setMessageInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [isPartnerOnline, setIsPartnerOnline] = useState<boolean>(false);
 
   useEffect(() => {
-  // Ovo će te automatski "baciti" na dno svaki put kad se niz poruka promijeni
-  scrollRef.current?.scrollIntoView({ behavior: "smooth" });
-}, [conversation?.messages]);
+    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [conversation?.messages]);
+
+  // 1. SIGNALR: MARK AS READ (Kada TI pročitaš poruke)
+  useEffect(() => {
+    if (connection && conversation?.id && !conversation.isNew) {
+      // Šaljemo signal serveru da smo ušli u chat i vidjeli poruke
+      // Backend treba imati metodu MarkAsRead(string conversationId)
+      connection.invoke("MarkAsRead", String(conversation.id))
+        .catch((err: any) => console.error("Greška pri slanju Seen statusa:", err));
+    }
+  }, [conversation?.id, conversation?.messages?.length, connection]);
+
+  // 2. SIGNALR: LISTENER ZA STATUS PARTNERA
+  useEffect(() => {
+    if (!connection || !conversation) {
+      setIsPartnerOnline(false);
+      return;
+    }
+
+    const partnerId = conversation.isNew 
+      ? conversation.id 
+      : conversation.participants?.find((p: any) => p.userId !== currentUserId)?.userId 
+        || conversation.recipientId 
+        || conversation.otherUserId;
+
+    if (!partnerId) return;
+
+    connection.invoke("IsThisUserOnline", partnerId)
+      .then((online: boolean) => setIsPartnerOnline(online))
+      .catch((err: any) => console.error("Greška pri provjeri statusa:", err));
+
+    const handleStatusChange = (userId: string, isOnline: boolean) => {
+      if (userId === partnerId) setIsPartnerOnline(isOnline);
+    };
+
+    connection.on("UserStatusChanged", handleStatusChange);
+
+    return () => {
+      connection.off("UserStatusChanged", handleStatusChange);
+    };
+  }, [connection, conversation, currentUserId]);
 
   const getChatTitle = () => {
     if (!conversation) return "";
-    
-    // Ako je user iz searcha, on ima polje 'name'
     if (conversation.isNew) return conversation.name || "Korisnik";
-    
     if (conversation.title) return conversation.title;
-    
     const other = conversation.participants?.find((p: any) => p.userId !== currentUserId);
     return other?.name || conversation.name || "Korisnik";
   };
@@ -35,23 +72,12 @@ export function ChatWindow({ conversation, currentUserId, onNewMessage }: ChatWi
 
     try {
       const isNew = conversation.isNew;
-      const conversationIdToSend = isNew 
-        ? "00000000-0000-0000-0000-000000000000" 
-        : conversation.id;
-
-      // Za novog usera recipientId je njegov ID (id iz search rezultata)
+      const conversationIdToSend = isNew ? "00000000-0000-0000-0000-000000000000" : conversation.id;
       const recipientId = isNew ? conversation.id : (conversation.recipientId || conversation.id);
 
-      const sentMessage = await sendMessage(
-        messageInput,
-        recipientId,
-        conversationIdToSend
-      );
-
+      const sentMessage = await sendMessage(messageInput, recipientId, conversationIdToSend);
       setMessageInput("");
-      if (onNewMessage) {
-        onNewMessage(sentMessage);
-      }
+      if (onNewMessage) onNewMessage(sentMessage);
     } catch (error) {
       console.error("Greška pri slanju:", error);
     }
@@ -73,12 +99,17 @@ export function ChatWindow({ conversation, currentUserId, onNewMessage }: ChatWi
     <div className="flex-1 flex flex-col bg-gray-950 relative">
       <div className="p-5 border-b border-gray-800 bg-gray-900/40 backdrop-blur-md flex items-center justify-between">
         <div className="flex items-center">
-          <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center font-black mr-3 shadow-lg text-white uppercase">
+          <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center font-black mr-3 shadow-lg text-white uppercase text-xl">
             {chatPartnerName[0]}
           </div>
           <div>
             <h2 className="text-lg font-bold tracking-tight text-white">{chatPartnerName}</h2>
-            <p className="text-[10px] text-green-500 font-bold uppercase tracking-wider">Online</p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <div className={`h-1.5 w-1.5 rounded-full ${isPartnerOnline ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-gray-600'}`} />
+              <p className={`text-[10px] font-bold uppercase tracking-wider ${isPartnerOnline ? 'text-green-500' : 'text-gray-500'}`}>
+                {isPartnerOnline ? 'Online' : 'Offline'}
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -92,7 +123,8 @@ export function ChatWindow({ conversation, currentUserId, onNewMessage }: ChatWi
                 key={msg.id || idx} 
                 content={msg.content} 
                 sentAt={msg.sentAt || msg.createdAt} 
-                isMe={msg.senderId === currentUserId} 
+                isMe={msg.senderId === currentUserId}
+                isRead={msg.isRead} // Proslijeđujemo status iz baze
               />
             ))
         ) : (
