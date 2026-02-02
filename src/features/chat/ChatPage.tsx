@@ -12,7 +12,6 @@ export default function ChatPage() {
   const { user, logout } = useAuth();
   const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
 
-  // 1. Učitavanje svih konverzacija za sidebar
   const fetchConversations = async () => {
     try {
       const data = await getUserConversations();
@@ -28,7 +27,6 @@ export default function ChatPage() {
     fetchConversations().finally(() => setIsLoading(false));
   }, []);
 
-  // 2. SignalR Inicijalizacija
   useEffect(() => {
     const newConnection = new signalR.HubConnectionBuilder()
       .withUrl("http://localhost:5078/chatHub")
@@ -36,24 +34,20 @@ export default function ChatPage() {
       .build();
 
     newConnection.start()
-      .then(() => {
-        setConnection(newConnection);
-        console.log("SignalR Connected");
-      })
+      .then(() => setConnection(newConnection))
       .catch(err => console.log("SignalR Error", err));
 
     return () => { newConnection.stop(); };
   }, []);
 
-  // 3. SignalR Listener (sa zaštitom od duplanja)
   useEffect(() => {
     if (connection && selectedConversation?.id) {
-      const currentId = String(selectedConversation.id).toLowerCase();
+      const currentConvId = String(selectedConversation.id).toLowerCase();
 
       connection.on("ReceiveMessage", (message: any) => {
-        const incomingId = String(message.conversationId || message.ConversationId || currentId).toLowerCase();
+        const incomingId = String(message.conversationId || message.ConversationId || currentConvId).toLowerCase();
         
-        if (incomingId === currentId) {
+        if (incomingId === currentConvId) {
           setSelectedConversation((prev: any) => {
             if (!prev) return prev;
             const messageId = message.id || message.Id;
@@ -62,35 +56,36 @@ export default function ChatPage() {
 
             return {
               ...prev,
-              messages: [...(prev.messages || []), {
-                ...message,
-                id: messageId,
-                content: message.content || message.Content,
-                senderId: message.senderId || message.SenderId,
-                sentAt: message.sentAt || message.SentAt
-              }]
+              messages: [...(prev.messages || []), message]
             };
           });
         }
         fetchConversations();
       });
 
-      connection.invoke("JoinConversation", currentId);
+      // OVO JE JEDINA STVAR KOJU DODAJEMO DA NE MORAŠ REFRESHATI
+      connection.on("MessagesRead", (convId: string) => {
+        if (String(selectedConversation.id).toLowerCase() === convId.toLowerCase()) {
+           // Umjesto ručnog mapiranja, samo ponovno povuci poruke iz baze za taj chat
+           // To je najsigurnije jer baza sigurno ima točan "IsRead" status
+           getConversationById(convId).then(data => {
+             setSelectedConversation(prev => prev ? { ...prev, ...data } : null);
+           });
+        }
+      });
+
+      connection.invoke("JoinConversation", currentConvId);
     }
 
     return () => {
       connection?.off("ReceiveMessage");
+      connection?.off("MessagesRead");
     };
   }, [connection, selectedConversation?.id]);
 
-  // 4. TVOJ ORIGINALNI KOD ZA UČITAVANJE PORUKA (VRAĆENO)
   useEffect(() => {
     const cid = selectedConversation?.id;
-    
-    // Blokiramo samo ako je ID baš prazan ili undefined. 
-    if (!cid || cid === "undefined") {
-      return;
-    }
+    if (!cid || cid === "undefined") return;
 
     const fetchMessages = async () => {
       try {
@@ -101,15 +96,13 @@ export default function ChatPage() {
           isNew: false 
         }));
       } catch (err) {
-        console.log("Chat još ne postoji u bazi podataka.");
+        console.log("Chat ne postoji.");
       }
     };
-
     fetchMessages();
-  }, [selectedConversation?.id]); // Reagira na promjenu selekcije
+  }, [selectedConversation?.id]);
 
-  // 5. Hendlanje slanja poruke (VRAĆENO NA TVOJE + Zaštita od duplanja)
-  const handleNewMessage = async (sentMessage: any) => {
+  const handleNewMessage = (sentMessage: any) => {
     if (sentMessage && sentMessage.conversationId) {
       setSelectedConversation((prev: any) => {
         if (!prev) return prev;
@@ -145,6 +138,7 @@ export default function ChatPage() {
         conversation={selectedConversation} 
         currentUserId={user?.id}
         onNewMessage={handleNewMessage}
+        connection={connection}
       />
     </div>
   );
