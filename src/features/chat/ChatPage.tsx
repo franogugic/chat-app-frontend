@@ -17,9 +17,7 @@ export default function ChatPage() {
       const data = await getUserConversations();
       const convs = (data as any).conversations || data;
       setConversations(Array.isArray(convs) ? convs : []);
-    } catch (err) {
-      console.error("Greška pri učitavanju konverzacija:", err);
-    }
+    } catch (err) { console.error("Greška pri učitavanju:", err); }
   };
 
   useEffect(() => {
@@ -32,51 +30,37 @@ export default function ChatPage() {
       .withUrl("http://localhost:5078/chatHub")
       .withAutomaticReconnect()
       .build();
-
     newConnection.start()
       .then(() => setConnection(newConnection))
       .catch(err => console.log("SignalR Error", err));
-
     return () => { newConnection.stop(); };
   }, []);
 
   useEffect(() => {
     if (connection && selectedConversation?.id) {
       const currentConvId = String(selectedConversation.id).toLowerCase();
-
       connection.on("ReceiveMessage", (message: any) => {
         const incomingId = String(message.conversationId || message.ConversationId || currentConvId).toLowerCase();
-        
         if (incomingId === currentConvId) {
           setSelectedConversation((prev: any) => {
             if (!prev) return prev;
             const messageId = message.id || message.Id;
             const alreadyExists = prev.messages?.some((m: any) => (m.id || m.Id) === messageId);
             if (alreadyExists) return prev;
-
-            return {
-              ...prev,
-              messages: [...(prev.messages || []), message]
-            };
+            return { ...prev, messages: [...(prev.messages || []), message] };
           });
         }
         fetchConversations();
       });
-
-      // OVO JE JEDINA STVAR KOJU DODAJEMO DA NE MORAŠ REFRESHATI
       connection.on("MessagesRead", (convId: string) => {
         if (String(selectedConversation.id).toLowerCase() === convId.toLowerCase()) {
-           // Umjesto ručnog mapiranja, samo ponovno povuci poruke iz baze za taj chat
-           // To je najsigurnije jer baza sigurno ima točan "IsRead" status
            getConversationById(convId).then(data => {
              setSelectedConversation(prev => prev ? { ...prev, ...data } : null);
            });
         }
       });
-
       connection.invoke("JoinConversation", currentConvId);
     }
-
     return () => {
       connection?.off("ReceiveMessage");
       connection?.off("MessagesRead");
@@ -86,18 +70,11 @@ export default function ChatPage() {
   useEffect(() => {
     const cid = selectedConversation?.id;
     if (!cid || cid === "undefined") return;
-
     const fetchMessages = async () => {
       try {
         const data = await getConversationById(cid);
-        setSelectedConversation((prev: any) => ({
-          ...prev,
-          ...data,
-          isNew: false 
-        }));
-      } catch (err) {
-        console.log("Chat ne postoji.");
-      }
+        setSelectedConversation((prev: any) => ({ ...prev, ...data, isNew: false }));
+      } catch (err) { console.log("Chat ne postoji."); }
     };
     fetchMessages();
   }, [selectedConversation?.id]);
@@ -109,7 +86,6 @@ export default function ChatPage() {
         const messageId = sentMessage.id || sentMessage.Id;
         const alreadyExists = prev.messages?.some((m: any) => (m.id || m.Id) === messageId);
         if (alreadyExists) return prev;
-
         return {
           ...prev,
           id: sentMessage.conversationId,
@@ -122,7 +98,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-950 overflow-hidden font-sans">
+    <div className="flex h-screen w-full bg-gray-50 overflow-hidden font-sans antialiased text-gray-900">
       <ChatSidebar 
         conversations={conversations}
         currentUser={user}
@@ -133,7 +109,6 @@ export default function ChatPage() {
         selectedId={selectedConversation?.id}
         onSelect={() => {}} 
       />
-      
       <ChatWindow 
         conversation={selectedConversation} 
         currentUserId={user?.id}

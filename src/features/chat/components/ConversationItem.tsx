@@ -7,35 +7,39 @@ interface ConversationItemProps {
 }
 
 export function ConversationItem({ conversation, isSelected, onClick }: ConversationItemProps) {
-  // Formatiranje vremena zadnje poruke
   const formatTime = (dateString?: string) => {
     if (!dateString) return "";
     return new Date(dateString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  const displayName = conversation.title || "Korisnik";
+
   return (
-    <div
+    <button
       onClick={onClick}
-      className={`p-4 rounded-xl cursor-pointer transition-all mb-1 ${
-        isSelected 
-          ? "bg-blue-600 shadow-lg shadow-blue-900/20 translate-x-1" 
-          : "hover:bg-gray-700/50 text-gray-300"
+      className={`w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition border-b border-gray-50 ${
+        isSelected ? 'bg-blue-50 border-r-4 border-r-blue-600' : ''
       }`}
     >
-      <div className="flex justify-between items-start mb-1">
-        <span className="font-bold text-sm truncate pr-2">
-          {conversation.title || "Privatni razgovor"}
-        </span>
-        {conversation.lastMessage && (
-          <span className={`text-[9px] whitespace-nowrap ${isSelected ? "text-blue-200" : "text-gray-500"}`}>
-            {formatTime(conversation.lastMessage.sentAt)}
-          </span>
-        )}
+      <div className="relative flex-shrink-0">
+        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-medium uppercase">
+          {displayName[0]}
+        </div>
       </div>
       
-      <p className={`text-xs truncate ${isSelected ? "text-blue-100" : "text-gray-500"}`}>
-        {conversation.lastMessage?.content || "Započni razgovor..."}
-      </p>
-    </div>
+      <div className="flex-1 text-left min-w-0">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className={`font-medium truncate ${isSelected ? 'text-blue-900' : 'text-gray-900'}`}>
+            {displayName}
+          </h3>
+          <span className="text-xs text-gray-500 ml-2">
+            {conversation.lastMessage ? formatTime(conversation.lastMessage.sentAt) : ""}
+          </span>
+        </div>
+        <p className={`text-sm truncate ${isSelected ? 'text-blue-700' : 'text-gray-600'}`}>
+          {conversation.lastMessage?.content || "Započni razgovor..."}
+        </p>
+      </div>
+    </button>
   );
 }
