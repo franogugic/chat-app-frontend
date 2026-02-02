@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { searchUsers, type AllUsersBySearchResponseDTO } from "../../auth/api/auth.api";
 import { ConversationItem } from "./ConversationItem";
-import { MessageCircle, Settings, LogOut, Search } from 'lucide-react';
+import { MessageCircle, LogOut, Search } from 'lucide-react';
 
 interface SidebarProps {
   currentUser: any;
@@ -46,7 +46,6 @@ export function ChatSidebar({ currentUser, logout, conversations, selectedId, on
 
   return (
     <div className="w-full md:w-80 lg:w-96 bg-white border-r border-gray-200 flex flex-col h-full">
-      {/* Header */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -63,7 +62,6 @@ export function ChatSidebar({ currentUser, logout, conversations, selectedId, on
           </div>
         </div>
 
-        {/* Search Input */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
@@ -79,47 +77,39 @@ export function ChatSidebar({ currentUser, logout, conversations, selectedId, on
         </div>
       </div>
 
-      {/* Lista */}
       <div className="flex-1 overflow-y-auto">
         {isSearchMode ? (
           <div className="flex flex-col">
-            {searchResults.length > 0 ? (
-              searchResults.map((u) => (
-                <button 
-                  key={u.id} 
-                  onClick={() => { onSelectUserFromSearch(u); setSearch(""); }} 
-                  className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition border-b border-gray-50"
-                >
-                  <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-gray-600 font-bold uppercase">
-                    {u.name[0]}
-                  </div>
-                  <div className="text-left">
-                    <p className="font-medium text-gray-900">{u.name}</p>
-                    <p className="text-xs text-blue-500">Započni novi chat</p>
-                  </div>
-                </button>
-              ))
-            ) : (
-              !isSearching && (
-                <div className="p-10 text-center text-gray-500 text-sm italic">Nema rezultata za "{search}"</div>
-              )
-            )}
+            {searchResults.map((u) => (
+              <button 
+                key={u.id} 
+                onClick={() => { onSelectUserFromSearch(u); setSearch(""); }} 
+                className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition border-b border-gray-50"
+              >
+                <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-gray-600 font-bold uppercase">
+                  {u.name[0]}
+                </div>
+                <div className="text-left">
+                  <p className="font-medium text-gray-900">{u.name}</p>
+                  <p className="text-xs text-blue-500">Započni novi chat</p>
+                </div>
+              </button>
+            ))}
           </div>
         ) : (
           <div className="flex flex-col">
             {loading ? (
               <div className="p-10 text-center text-gray-500 text-sm">Učitavanje...</div>
-            ) : conversations.length > 0 ? (
+            ) : (
               conversations.map((c) => (
                 <ConversationItem 
                   key={c.id} 
                   conversation={c} 
                   isSelected={selectedId === c.id} 
                   onClick={() => onSelectConversation(c)} 
+                  currentUserId={currentUser?.id} // BITNO: Proslijeđeno za kvačice
                 />
               ))
-            ) : (
-              <div className="p-10 text-center text-gray-500 text-sm italic">Nema aktivnih razgovora.</div>
             )}
           </div>
         )}
