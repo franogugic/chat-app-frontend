@@ -1,6 +1,7 @@
 import { useState, type FormEvent, useRef, useEffect } from "react";
 import { MessageBubble } from "./MessageBubble";
 import { sendMessage } from "../../auth/api/conversation.api";
+import { Phone, Video, MoreVertical, Smile, Send, MessageCircle } from 'lucide-react';
 
 interface ChatWindowProps {
   conversation: any | null;
@@ -18,138 +19,105 @@ export function ChatWindow({ conversation, currentUserId, onNewMessage, connecti
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [conversation?.messages]);
 
-  // 1. SIGNALR: MARK AS READ (Kada TI pročitaš poruke)
   useEffect(() => {
     if (connection && conversation?.id && !conversation.isNew) {
-      // Šaljemo signal serveru da smo ušli u chat i vidjeli poruke
-      // Backend treba imati metodu MarkAsRead(string conversationId)
-      connection.invoke("MarkAsRead", String(conversation.id))
-        .catch((err: any) => console.error("Greška pri slanju Seen statusa:", err));
+      connection.invoke("MarkAsRead", String(conversation.id)).catch((err: any) => console.error(err));
     }
   }, [conversation?.id, conversation?.messages?.length, connection]);
 
-  // 2. SIGNALR: LISTENER ZA STATUS PARTNERA
+  // Usklađena logika za partnera
+  const partner = conversation?.participants?.find((p: any) => p.userId !== currentUserId) 
+               || (conversation?.isNew ? conversation : null);
+  
+  const partnerId = partner?.userId || conversation?.recipientId || (conversation?.isNew ? conversation.id : null);
+  const chatPartnerName = partner?.name || partner?.username || conversation?.title || conversation?.name || "Chat";
+
   useEffect(() => {
-    if (!connection || !conversation) {
+    if (!connection || !partnerId) {
       setIsPartnerOnline(false);
       return;
     }
-
-    const partnerId = conversation.isNew 
-      ? conversation.id 
-      : conversation.participants?.find((p: any) => p.userId !== currentUserId)?.userId 
-        || conversation.recipientId 
-        || conversation.otherUserId;
-
-    if (!partnerId) return;
-
     connection.invoke("IsThisUserOnline", partnerId)
       .then((online: boolean) => setIsPartnerOnline(online))
-      .catch((err: any) => console.error("Greška pri provjeri statusa:", err));
+      .catch((err: any) => console.error(err));
 
-    const handleStatusChange = (userId: string, isOnline: boolean) => {
-      if (userId === partnerId) setIsPartnerOnline(isOnline);
-    };
-
+    const handleStatusChange = (uId: string, status: boolean) => { if (uId === partnerId) setIsPartnerOnline(status); };
     connection.on("UserStatusChanged", handleStatusChange);
-
-    return () => {
-      connection.off("UserStatusChanged", handleStatusChange);
-    };
-  }, [connection, conversation, currentUserId]);
-
-  const getChatTitle = () => {
-    if (!conversation) return "";
-    if (conversation.isNew) return conversation.name || "Korisnik";
-    if (conversation.title) return conversation.title;
-    const other = conversation.participants?.find((p: any) => p.userId !== currentUserId);
-    return other?.name || conversation.name || "Korisnik";
-  };
+    return () => { connection.off("UserStatusChanged", handleStatusChange); };
+  }, [connection, partnerId]);
 
   const handleSend = async (e: FormEvent) => {
     e.preventDefault();
     if (!messageInput.trim() || !conversation) return;
-
     try {
       const isNew = conversation.isNew;
       const conversationIdToSend = isNew ? "00000000-0000-0000-0000-000000000000" : conversation.id;
-      const recipientId = isNew ? conversation.id : (conversation.recipientId || conversation.id);
-
+      const recipientId = isNew ? conversation.id : (conversation.recipientId || partnerId);
       const sentMessage = await sendMessage(messageInput, recipientId, conversationIdToSend);
       setMessageInput("");
       if (onNewMessage) onNewMessage(sentMessage);
-    } catch (error) {
-      console.error("Greška pri slanju:", error);
-    }
+    } catch (error) { console.error(error); }
   };
 
   if (!conversation) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center space-y-4 opacity-20 bg-gray-950">
-        <h1 className="text-4xl font-black text-white uppercase tracking-tighter text-gray-800">Chat App</h1>
-        <p className="text-gray-600 text-xs font-bold tracking-[0.3em]">ODABERITE RAZGOVOR ZA POČETAK</p>
+      <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 text-center p-4">
+        <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mb-4">
+          <MessageCircle className="w-8 h-8 text-gray-400" />
+        </div>
+        <h2 className="text-xl font-semibold text-gray-900 uppercase tracking-widest">Chat App</h2>
+        <p className="text-gray-400 text-sm mt-2">Select a person to start chatting</p>
       </div>
     );
   }
 
-  const chatPartnerName = getChatTitle();
-  const messages = conversation.messages || [];
-
   return (
-    <div className="flex-1 flex flex-col bg-gray-950 relative">
-      <div className="p-5 border-b border-gray-800 bg-gray-900/40 backdrop-blur-md flex items-center justify-between">
-        <div className="flex items-center">
-          <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center font-black mr-3 shadow-lg text-white uppercase text-xl">
-            {chatPartnerName[0]}
+    <div className="flex-1 flex flex-col bg-white">
+      <div className="h-16 border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-medium uppercase">
+              {chatPartnerName[0]}
+            </div>
+            {isPartnerOnline && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>}
           </div>
           <div>
-            <h2 className="text-lg font-bold tracking-tight text-white">{chatPartnerName}</h2>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <div className={`h-1.5 w-1.5 rounded-full ${isPartnerOnline ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-gray-600'}`} />
-              <p className={`text-[10px] font-bold uppercase tracking-wider ${isPartnerOnline ? 'text-green-500' : 'text-gray-500'}`}>
-                {isPartnerOnline ? 'Online' : 'Offline'}
-              </p>
-            </div>
+            <h2 className="font-medium text-gray-900 leading-tight">{chatPartnerName}</h2>
+            <p className={`text-xs ${isPartnerOnline ? 'text-green-500 font-bold' : 'text-gray-500'}`}>
+              {isPartnerOnline ? 'Online' : 'Offline'}
+            </p>
           </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="p-2 hover:bg-gray-100 rounded-lg transition"><Phone className="w-5 h-5 text-gray-600" /></button>
+          <button className="p-2 hover:bg-gray-100 rounded-lg transition"><Video className="w-5 h-5 text-gray-600" /></button>
+          <button className="p-2 hover:bg-gray-100 rounded-lg transition"><MoreVertical className="w-5 h-5 text-gray-600" /></button>
         </div>
       </div>
 
-      <div className="flex-1 p-6 overflow-y-auto flex flex-col gap-4 custom-scrollbar">
-        {messages.length > 0 ? (
-          [...messages]
-            .sort((a, b) => new Date(a.sentAt || a.createdAt).getTime() - new Date(b.sentAt || b.createdAt).getTime())
-            .map((msg: any, idx: number) => (
-              <MessageBubble 
-                key={msg.id || idx} 
-                content={msg.content} 
-                sentAt={msg.sentAt || msg.createdAt} 
-                isMe={msg.senderId === currentUserId}
-                isRead={msg.isRead} // Proslijeđujemo status iz baze
-              />
-            ))
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-600 space-y-4">
-            <p className="text-sm font-medium text-gray-400">Vaš sandučić je prazan.</p>
-          </div>
-        )}
+      <div className="flex-1 p-6 overflow-y-auto flex flex-col gap-4 bg-gray-50">
+        {(conversation.messages || []).map((msg: any, idx: number) => (
+          <MessageBubble key={msg.id || idx} content={msg.content} sentAt={msg.sentAt || msg.createdAt} isMe={msg.senderId === currentUserId} isRead={msg.isRead} />
+        ))}
         <div ref={scrollRef} />
       </div>
 
-      <div className="p-5 border-t border-gray-800 bg-gray-900/50">
-        <form onSubmit={handleSend} className="max-w-5xl mx-auto flex gap-3">
-          <input
-            type="text"
-            placeholder={`Napiši poruku...`}
-            value={messageInput}
-            onChange={(e) => setMessageInput(e.target.value)}
-            className="flex-1 bg-gray-800 border border-gray-700 rounded-2xl p-4 text-sm outline-none text-white focus:border-blue-500 transition-all"
-          />
-          <button 
-            type="submit" 
-            disabled={!messageInput.trim()}
-            className="bg-blue-600 hover:bg-blue-500 disabled:opacity-30 px-8 py-3 rounded-2xl font-black text-sm uppercase text-white shadow-lg active:scale-95"
-          >
-            Pošalji
+      <div className="bg-white border-t border-gray-200 p-4">
+        <form onSubmit={handleSend} className="max-w-5xl mx-auto flex items-center gap-3">
+          <div className="flex-1 relative flex items-center">
+            <textarea
+              value={messageInput}
+              onChange={(e) => setMessageInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(e); } }}
+              placeholder="Type a message..."
+              rows={1}
+              className="w-full pl-4 pr-12 py-3 border border-gray-300 rounded-xl resize-none outline-none focus:ring-2 focus:ring-blue-500 transition block leading-normal"
+              style={{ minHeight: '48px', maxHeight: '120px' }}
+            />
+            <button type="button" className="absolute right-3 p-1.5 hover:bg-gray-100 rounded-full transition"><Smile className="w-5 h-5 text-gray-400" /></button>
+          </div>
+          <button type="submit" disabled={!messageInput.trim()} className="flex-shrink-0 w-12 h-12 bg-blue-600 text-white rounded-xl flex items-center justify-center disabled:opacity-50 hover:bg-blue-700 transition">
+            <Send className="w-5 h-5" />
           </button>
         </form>
       </div>
