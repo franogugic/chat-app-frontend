@@ -18,7 +18,6 @@ export default function ChatPage() {
       const convs = (data as any).conversations || data;
       
       const processedConvs = (Array.isArray(convs) ? convs : []).map((c: any) => {
-        // Ručni izračun nepročitanih na temelju zadnje poruke ako backend ne šalje count
         let count = 0;
         const lastMsg = c.lastMessage;
         if (lastMsg && lastMsg.senderId !== user?.id && !(lastMsg.isRead || lastMsg.IsRead)) {
