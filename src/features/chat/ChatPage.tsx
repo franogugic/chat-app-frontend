@@ -9,6 +9,7 @@ export default function ChatPage() {
   const [conversations, setConversations] = useState<ConversationResponse[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<ConversationResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]); // Pratimo online ID-ove
   const { user, logout } = useAuth();
   const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
 
@@ -17,9 +18,7 @@ export default function ChatPage() {
       const data = await getUserConversations();
       const convs = (data as any).conversations || data;
       setConversations(Array.isArray(convs) ? convs : []);
-    } catch (err) {
-      console.error("Greška pri učitavanju konverzacija:", err);
-    }
+    } catch (err) { console.error(err); }
   };
 
   useEffect(() => {
@@ -34,97 +33,77 @@ export default function ChatPage() {
       .build();
 
     newConnection.start()
-      .then(() => setConnection(newConnection))
-      .catch(err => console.log("SignalR Error", err));
+      .then(() => {
+        setConnection(newConnection);
+        // Kada se spoji, možemo tražiti listu svih trenutno online usera ako backend to podržava
+        // Ili čekati "UserStatusChanged" evente
+      })
+      .catch(err => console.log(err));
 
     return () => { newConnection.stop(); };
   }, []);
 
   useEffect(() => {
-    if (connection && selectedConversation?.id) {
-      const currentConvId = String(selectedConversation.id).toLowerCase();
+    if (connection) {
+      // Slušamo promjene statusa za SIDEBAR
+      connection.on("UserStatusChanged", (userId: string, isOnline: boolean) => {
+        setOnlineUsers(prev => {
+          if (isOnline) return prev.includes(userId) ? prev : [...prev, userId];
+          return prev.filter(id => id !== userId);
+        });
+      });
 
       connection.on("ReceiveMessage", (message: any) => {
-        const incomingId = String(message.conversationId || message.ConversationId || currentConvId).toLowerCase();
+        const currentConvId = selectedConversation?.id ? String(selectedConversation.id).toLowerCase() : null;
+        const incomingId = String(message.conversationId || message.ConversationId).toLowerCase();
         
         if (incomingId === currentConvId) {
           setSelectedConversation((prev: any) => {
             if (!prev) return prev;
-            const messageId = message.id || message.Id;
-            const alreadyExists = prev.messages?.some((m: any) => (m.id || m.Id) === messageId);
-            if (alreadyExists) return prev;
-
-            return {
-              ...prev,
-              messages: [...(prev.messages || []), message]
-            };
+            if (prev.messages?.some((m: any) => (m.id || m.Id) === (message.id || message.Id))) return prev;
+            return { ...prev, messages: [...(prev.messages || []), message] };
           });
         }
         fetchConversations();
       });
 
-      // OVO JE JEDINA STVAR KOJU DODAJEMO DA NE MORAŠ REFRESHATI
       connection.on("MessagesRead", (convId: string) => {
-        if (String(selectedConversation.id).toLowerCase() === convId.toLowerCase()) {
-           // Umjesto ručnog mapiranja, samo ponovno povuci poruke iz baze za taj chat
-           // To je najsigurnije jer baza sigurno ima točan "IsRead" status
-           getConversationById(convId).then(data => {
-             setSelectedConversation(prev => prev ? { ...prev, ...data } : null);
-           });
+        if (selectedConversation?.id && String(selectedConversation.id).toLowerCase() === convId.toLowerCase()) {
+           getConversationById(convId).then(data => setSelectedConversation(prev => prev ? { ...prev, ...data } : null));
         }
+        fetchConversations();
       });
-
-      connection.invoke("JoinConversation", currentConvId);
     }
-
     return () => {
+      connection?.off("UserStatusChanged");
       connection?.off("ReceiveMessage");
       connection?.off("MessagesRead");
     };
   }, [connection, selectedConversation?.id]);
 
-  useEffect(() => {
-    const cid = selectedConversation?.id;
-    if (!cid || cid === "undefined") return;
-
-    const fetchMessages = async () => {
-      try {
-        const data = await getConversationById(cid);
-        setSelectedConversation((prev: any) => ({
-          ...prev,
-          ...data,
-          isNew: false 
-        }));
-      } catch (err) {
-        console.log("Chat ne postoji.");
-      }
+  // Mapiramo konverzacije i dodajemo isOnline status na temelju onlineUsers niza
+  const conversationsWithStatus = conversations.map(conv => {
+    const partnerId = conv.recipientId || conv.participants?.find((p: any) => p.userId !== user?.id)?.userId;
+    return {
+      ...conv,
+      isOnline: onlineUsers.includes(partnerId || '')
     };
-    fetchMessages();
-  }, [selectedConversation?.id]);
+  });
 
   const handleNewMessage = (sentMessage: any) => {
     if (sentMessage && sentMessage.conversationId) {
       setSelectedConversation((prev: any) => {
         if (!prev) return prev;
-        const messageId = sentMessage.id || sentMessage.Id;
-        const alreadyExists = prev.messages?.some((m: any) => (m.id || m.Id) === messageId);
-        if (alreadyExists) return prev;
-
-        return {
-          ...prev,
-          id: sentMessage.conversationId,
-          isNew: false,
-          messages: [...(prev?.messages || []), sentMessage]
-        };
+        return { ...prev, id: sentMessage.conversationId, isNew: false, messages: [...(prev?.messages || []), sentMessage] };
       });
     }
     fetchConversations();
   };
 
   return (
-    <div className="flex h-screen bg-gray-950 overflow-hidden font-sans">
+    <div className="h-screen w-full flex bg-gray-50 overflow-hidden font-sans">
       <ChatSidebar 
-        conversations={conversations}
+        conversations={conversationsWithStatus}
         currentUser={user}
         logout={logout}
         onSelectConversation={(conv) => setSelectedConversation({ ...conv, isNew: false })}
@@ -133,7 +112,6 @@ export default function ChatPage() {
         selectedId={selectedConversation?.id}
         onSelect={() => {}} 
       />
-      
       <ChatWindow 
         conversation={selectedConversation} 
         currentUserId={user?.id}
