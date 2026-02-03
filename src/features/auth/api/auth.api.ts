@@ -1,6 +1,5 @@
 import type { LoginRequest, LoginResponse } from "../types/auth.types";
 import { API_BASE_URL } from "../utils/config";
-import type { ConversationResponse } from "./conversation.api";
 
 // ruta s postamnana za logijn http://localhost:5078/api/auth/login
 
