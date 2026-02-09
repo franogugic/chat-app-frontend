@@ -35,17 +35,26 @@ export function ChatWindow({ conversation, currentUserId, onNewMessage, connecti
       return;
     }
 
-    const partnerId = conversation.isNew 
-      ? conversation.id 
-      : conversation.participants?.find((p: any) => p.userId !== currentUserId)?.userId 
-        || conversation.recipientId 
+    // Check if connection is actually connected
+    if (connection.state !== "Connected") {
+      setIsPartnerOnline(false);
+      return;
+    }
+
+    const partnerId = conversation.isNew
+      ? conversation.id
+      : conversation.participants?.find((p: any) => p.userId !== currentUserId)?.userId
+        || conversation.recipientId
         || conversation.otherUserId;
 
-    if (!partnerId) return;
+    if (!partnerId) {
+      setIsPartnerOnline(false);
+      return;
+    }
 
     connection.invoke("IsThisUserOnline", partnerId)
       .then((online: boolean) => setIsPartnerOnline(online))
-      .catch((err: any) => console.error("Greška pri provjeri statusa:", err));
+      .catch((err: any) => console.error("Error checking online status:", err));
 
     const handleStatusChange = (userId: string, isOnline: boolean) => {
       if (userId === partnerId) setIsPartnerOnline(isOnline);

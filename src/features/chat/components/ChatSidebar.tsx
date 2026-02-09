@@ -11,9 +11,10 @@ interface SidebarProps {
   onSelectUserFromSearch: (user: any) => void; // Prima cijeli user objekt
   loading: boolean;
   onSelect: (conversation: any) => void;
+  unreadConversations: Set<string>;
 }
 
-export function ChatSidebar({ currentUser, logout, conversations, selectedId, onSelectConversation, onSelectUserFromSearch, loading }: SidebarProps) {
+export function ChatSidebar({ currentUser, logout, conversations, selectedId, onSelectConversation, onSelectUserFromSearch, loading, unreadConversations }: SidebarProps) {
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<AllUsersBySearchResponseDTO[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -97,11 +98,12 @@ export function ChatSidebar({ currentUser, logout, conversations, selectedId, on
               <p className="text-center text-gray-600 text-xs mt-10">Učitavanje...</p>
             ) : conversations.length > 0 ? (
               conversations.map((c) => (
-                <ConversationItem 
-                  key={c.id} 
-                  conversation={c} 
-                  isSelected={selectedId === c.id} 
-                  onClick={() => onSelectConversation(c)} 
+                <ConversationItem
+                  key={c.id}
+                  conversation={c}
+                  isSelected={selectedId === c.id}
+                  onClick={() => onSelectConversation(c)}
+                  hasUnread={unreadConversations.has(String(c.id).toLowerCase())}
                 />
               ))
             ) : (
