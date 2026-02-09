@@ -227,9 +227,24 @@ export default function ChatPage() {
   };
 
   const handleSelectUserFromSearch = (u: any) => {
-    selectedConvIdRef.current = null;
-    setSelectedConversation({ ...u, isNew: true, messages: [] });
-  };
+  selectedConvIdRef.current = null;
+  
+  const existingConv = conversations.find(c => 
+    c.participants?.some(p => String(p.userId).toLowerCase() === String(u.id).toLowerCase())
+  );
+
+  if (existingConv) {
+    handleSelectConversation(existingConv);
+  } else {
+   setSelectedConversation({ 
+      id: u.id, 
+      name: u.name, 
+      title: u.name, 
+      isNew: false, 
+      messages: [] 
+    } as ConversationResponse);
+  }
+};
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
