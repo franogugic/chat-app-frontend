@@ -32,7 +32,7 @@ export function LoginPage() {
 
       navigate("/chat");
     } catch (err) {
-      setError("Neispravni podaci za prijavu");
+      setError("Invalid login credentials");
     } finally {
       setLoading(false);
     }
@@ -40,10 +40,8 @@ export function LoginPage() {
 
   return (
     <div className="min-h-screen w-full flex">
-      {/* Lijeva strana - Form (Identično prema dizajnu) */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-md">
-          {/* Logo i naslov */}
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
@@ -51,14 +49,13 @@ export function LoginPage() {
               </div>
               <h1 className="text-3xl font-semibold text-gray-900">ChatApp</h1>
             </div>
-            <p className="text-gray-600 mt-4">Dobrodošli natrag! Prijavite se na svoj račun.</p>
+            <p className="text-gray-600 mt-4">Welcome back! Log in to your account.</p>
           </div>
 
-          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email adresa
+                Email address
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -68,7 +65,7 @@ export function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                  placeholder="ime@primjer.com"
+                  placeholder="name@example.com"
                   required
                 />
               </div>
@@ -76,7 +73,7 @@ export function LoginPage() {
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Lozinka
+                Password
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -86,7 +83,7 @@ export function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                  placeholder="Unesite lozinku"
+                  placeholder="Enter your password"
                   required
                 />
               </div>
@@ -98,10 +95,10 @@ export function LoginPage() {
                   type="checkbox"
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
-                <span className="ml-2 text-sm text-gray-600">Zapamti me</span>
+                <span className="ml-2 text-sm text-gray-600">Remember me</span>
               </label>
               <a href="#" className="text-sm text-blue-600 hover:text-blue-700">
-                Zaboravljena lozinka?
+                Forgot password?
               </a>
             </div>
 
@@ -114,28 +111,26 @@ export function LoginPage() {
               disabled={loading}
               className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-medium"
             >
-              {loading ? "Prijavljivanje..." : "Prijavite se"}
+              {loading ? "Logging in..." : "Log in"}
             </button>
           </form>
 
-          {/* Register link */}
           <p className="mt-6 text-center text-gray-600">
-            Nemate račun?{' '}
+            Don't have an account?{' '}
             <Link to="/register" className="text-blue-600 hover:text-blue-700 font-medium">
-              Registrirajte se
+              Register
             </Link>
           </p>
         </div>
       </div>
 
-      {/* Desna strana - Visual (Identično prema dizajnu) */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 to-purple-600 items-center justify-center p-12">
         <div className="max-w-lg text-white">
           <h2 className="text-4xl font-semibold mb-6">
-            Povežite se sa svima, bilo gdje i bilo kada
+            Connect with everyone, anywhere and anytime
           </h2>
           <p className="text-lg text-blue-100 mb-8">
-            Moderna chat aplikacija koja omogućava instant komunikaciju sa vašim prijateljima, kolegama i porodicom.
+            A modern chat application that enables instant communication with your friends, colleagues, and family.
           </p>
           <div className="space-y-4">
             <div className="flex items-start gap-3">
@@ -145,8 +140,8 @@ export function LoginPage() {
                 </svg>
               </div>
               <div>
-                <h3 className="font-medium mb-1">Brze poruke u realnom vremenu</h3>
-                <p className="text-blue-100 text-sm">Razmjenjujte poruke instant bez kašnjenja</p>
+                <h3 className="font-medium mb-1">Fast real-time messaging</h3>
+                <p className="text-blue-100 text-sm">Exchange messages instantly without delays</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
@@ -156,8 +151,8 @@ export function LoginPage() {
                 </svg>
               </div>
               <div>
-                <h3 className="font-medium mb-1">Sigurna komunikacija</h3>
-                <p className="text-blue-100 text-sm">Vaše poruke su šifrirane i zaštićene</p>
+                <h3 className="font-medium mb-1">Secure communication</h3>
+                <p className="text-blue-100 text-sm">Your messages are encrypted and protected</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
@@ -167,8 +162,8 @@ export function LoginPage() {
                 </svg>
               </div>
               <div>
-                <h3 className="font-medium mb-1">Multiplatformska podrška</h3>
-                <p className="text-blue-100 text-sm">Pristupite sa bilo kojeg uređaja</p>
+                <h3 className="font-medium mb-1">Multi-platform support</h3>
+                <p className="text-blue-100 text-sm">Access from any device</p>
               </div>
             </div>
           </div>

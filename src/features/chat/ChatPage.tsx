@@ -20,7 +20,7 @@ export default function ChatPage() {
       const convs = (data as any).conversations || data;
       setConversations(Array.isArray(convs) ? convs : []);
     } catch (err) {
-      console.error("Greška pri učitavanju konverzacija:", err);
+      console.error("Error loading conversation:", err);
     }
   };
 
@@ -29,11 +29,9 @@ export default function ChatPage() {
     fetchConversations().finally(() => setIsLoading(false));
   }, []);
 
-  // Join all conversation rooms gradually to receive notifications
   useEffect(() => {
     if (!connection || conversations.length === 0) return;
 
-    // Join conversations one at a time with 200ms delay
     conversations.forEach((conv, index) => {
       setTimeout(() => {
         const convId = String(conv.id).toLowerCase();
@@ -43,53 +41,69 @@ export default function ChatPage() {
   }, [connection, conversations]);
 
   useEffect(() => {
-    let isMounted = true;
+  let isMounted = true;
 
-    const newConnection = new signalR.HubConnectionBuilder()
-      .withUrl("http://localhost:5078/chatHub", {
-        accessTokenFactory: () => {
-          const token = document.cookie.split('; ')
-            .find(row => row.startsWith('access-token='))
-            ?.split('=')[1] || "";
-          return token;
-        }
-      })
-      .withAutomaticReconnect([0, 2000, 5000, 10000])
-      .configureLogging(signalR.LogLevel.Information)
-      .build();
+  const getAccessToken = () => {
+    const name = "access-token=";
+    const decodedCookie = decodeURIComponent(document.cookie);
+    const ca = decodedCookie.split(';');
+    for (let i = 0; i < ca.length; i++) {
+      let c = ca[i].trim();
+      if (c.indexOf(name) === 0) return c.substring(name.length, c.length);
+    }
+    return "";
+  };
 
-    newConnection.start()
-      .then(() => {
+  const newConnection = new signalR.HubConnectionBuilder()
+    .withUrl("http://localhost:5078/chatHub", {
+      accessTokenFactory: () => getAccessToken(),
+      skipNegotiation: false, 
+      transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.LongPolling
+    })
+    .withAutomaticReconnect([0, 2000, 5000, 10000])
+    .configureLogging(signalR.LogLevel.Information)
+    .build();
+
+  const startConnection = async () => {
+    try {
+      if (newConnection.state === signalR.HubConnectionState.Disconnected) {
+        await newConnection.start();
         if (isMounted) {
+          console.log("SignalR Connected.");
           setConnection(newConnection);
         }
-      })
-      .catch(err => console.error("SignalR connection error:", err));
-
-    // Handle reconnection
-    newConnection.onreconnecting(() => {
-      setConnection(null);
-    });
-
-    newConnection.onreconnected(() => {
+      }
+    } catch (err) {
+      console.error("SignalR connection error:", err);
       if (isMounted) {
-        setConnection(newConnection);
+        setTimeout(startConnection, 5000);
       }
-    });
+    }
+  };
 
-    newConnection.onclose(() => {
+  startConnection();
+
+  newConnection.onreconnecting(() => setConnection(null));
+  newConnection.onreconnected(() => isMounted && setConnection(newConnection));
+  
+  newConnection.onclose((error) => {
+    if (isMounted) {
       setConnection(null);
-    });
-
-    return () => {
-      isMounted = false;
-      if (newConnection.state === signalR.HubConnectionState.Connected) {
-        newConnection.stop();
+      if (error) {
+        console.warn("Connection closed with error, attempting restart...", error);
+        startConnection();
       }
-    };
-  }, []);
+    }
+  });
 
-  // Set up SignalR listeners once when connection is established
+  return () => {
+    isMounted = false;
+    if (newConnection.state !== signalR.HubConnectionState.Disconnected) {
+      newConnection.stop();
+    }
+  };
+}, []);
+
   useEffect(() => {
     if (!connection) return;
 
@@ -98,14 +112,12 @@ export default function ChatPage() {
 
       setSelectedConversation((prev: any) => {
         if (!prev) {
-          // No conversation selected, mark as unread
           setUnreadConversations(unread => new Set(unread).add(incomingConvId));
           return prev;
         }
 
         const currentConvId = String(prev.id).toLowerCase();
 
-        // Only add message if it's for the current conversation
         if (incomingConvId === currentConvId) {
           const messageId = message.id || message.Id;
           const alreadyExists = prev.messages?.some((m: any) => (m.id || m.Id) === messageId);
@@ -116,14 +128,12 @@ export default function ChatPage() {
             messages: [...(prev.messages || []), message]
           };
         } else {
-          // Message for different conversation, mark as unread
           setUnreadConversations(unread => new Set(unread).add(incomingConvId));
         }
 
         return prev;
       });
 
-      // Update sidebar
       fetchConversations();
     };
 
@@ -132,7 +142,6 @@ export default function ChatPage() {
         if (!prev) return prev;
 
         if (String(prev.id).toLowerCase() === convId.toLowerCase()) {
-          // Refetch conversation to get updated read status
           getConversationById(convId).then(data => {
             setSelectedConversation(current => current ? { ...current, ...data } : null);
           });
@@ -150,23 +159,19 @@ export default function ChatPage() {
     };
   }, [connection]);
 
-  // Join conversation and fetch messages only when user selects a new conversation
   useEffect(() => {
     const convId = selectedConversation?.id;
     if (!connection || !convId || convId === "undefined") return;
 
     const convIdStr = String(convId).toLowerCase();
 
-    // Only fetch if this is a different conversation than what we had before
     if (selectedConvIdRef.current === convIdStr) return;
 
     selectedConvIdRef.current = convIdStr;
 
-    // Join the SignalR room
     connection.invoke("JoinConversation", convIdStr)
       .catch((err: any) => console.error("Error joining conversation:", err));
 
-    // Fetch messages only for existing conversations (not new ones)
     if (!selectedConversation.isNew) {
       getConversationById(convId)
         .then(data => {
@@ -192,7 +197,6 @@ export default function ChatPage() {
         const newConvId = sentMessage.conversationId;
         const isNewConversation = prev.isNew || prev.id !== newConvId;
 
-        // Update ref if this is a new conversation being created
         if (isNewConversation) {
           selectedConvIdRef.current = String(newConvId).toLowerCase();
         }
@@ -205,17 +209,15 @@ export default function ChatPage() {
         };
       });
 
-      // Update sidebar to show the new/updated conversation
       fetchConversations();
     }
   };
 
   const handleSelectConversation = (conv: any) => {
-    // Reset the ref so the useEffect will fetch messages
+
     selectedConvIdRef.current = null;
     setSelectedConversation({ ...conv, isNew: false });
 
-    // Mark conversation as read (remove from unread set)
     const convId = String(conv.id).toLowerCase();
     setUnreadConversations(unread => {
       const newUnread = new Set(unread);
@@ -225,13 +227,12 @@ export default function ChatPage() {
   };
 
   const handleSelectUserFromSearch = (u: any) => {
-    // Reset the ref for new conversation
     selectedConvIdRef.current = null;
     setSelectedConversation({ ...u, isNew: true, messages: [] });
   };
 
   return (
-    <div className="flex h-screen bg-gray-950 overflow-hidden font-sans">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
       <ChatSidebar
         conversations={conversations}
         currentUser={user}
