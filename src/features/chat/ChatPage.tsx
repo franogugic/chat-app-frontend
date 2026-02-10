@@ -15,14 +15,24 @@ export default function ChatPage() {
   const [unreadConversations, setUnreadConversations] = useState<Set<string>>(new Set());
 
   const fetchConversations = async () => {
-    try {
-      const data = await getUserConversations();
-      const convs = (data as any).conversations || data;
-      setConversations(Array.isArray(convs) ? convs : []);
-    } catch (err) {
-      console.error("Error loading conversation:", err);
-    }
-  };
+  try {
+    const data = await getUserConversations();
+    const convs = (data as any).conversations || data;
+    const arrayConvs = Array.isArray(convs) ? convs : [];
+    
+    const unreadSet = new Set<string>();
+    arrayConvs.forEach((c: any) => {
+      if (c.lastMessage && !c.lastMessage.isRead && c.lastMessage.senderId !== user?.id) {
+        unreadSet.add(String(c.id).toLowerCase());
+      }
+    });
+    
+    setUnreadConversations(unreadSet);
+    setConversations(arrayConvs);
+  } catch (err) {
+    console.error("Error loading conversations:", err);
+  }
+};
 
   useEffect(() => {
     setIsLoading(true);
