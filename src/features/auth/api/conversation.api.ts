@@ -17,11 +17,12 @@ export interface MessageResponse {
 
 export interface ConversationResponse {
   id: string;
-  title: string;
-  lastMessage: LastMessage | null;
+  title?: string;
+  lastMessage?: LastMessage | null;
   messages?: MessageResponse[]; 
   isNew?: boolean;
   name?: string;
+  participants?: { userId: string; name: string }[];
 }
 
 export interface GetConversationsResponse {
